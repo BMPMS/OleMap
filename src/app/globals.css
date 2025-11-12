@@ -1,0 +1,32 @@
+@import "../../node_modules/tailwindcss";
+
+.noselect {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none;     /* IE 10+ */
+}
+
+:root {
+  --background: #24242e;
+  --foreground: #f1f0ff;
+  --font-figtree: 'Figtree', sans-serif;
+  --font-merriweather: 'Merriweather', serif;
+}
+
+/* Hide the Next.js development badge */
+#__next > div > div > div > div > div {
+  display: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Figtree;
+}
