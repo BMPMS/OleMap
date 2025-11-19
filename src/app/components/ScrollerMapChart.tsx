@@ -63,15 +63,30 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             .attr("stroke","#A0A0A0")
             .attr("d", path);
 
+        const categoryColors = {
+            7: "#ab479d",
+            10:"#df4256",
+            2: "#f29943",
+            5: "#1ba2db",
+            4: "#1ba2db",
+            1:"#fed000",
+            3:"#aac316"
+        }
+        const categories = Object.keys(categoryColors)
+            .map((m) => +m);
+
         const dotData = mapData.features
             .filter((f) => f.geometry.type === "Point")
             .reduce((acc, entry) => {
-                acc.push({
-                    coords: projection(entry.geometry.coordinates),
-                    properties: entry.properties
-                })
+                if(categories.includes(entry.properties.category)){
+                    acc.push({
+                        coords: projection(entry.geometry.coordinates),
+                        properties: entry.properties
+                    })
+                }
                 return acc;
             },[]);
+
 
 
         const dataDots = svg
@@ -84,13 +99,15 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             });
         dataDots.attr("transform", `translate(${margin.left},${margin.right})`);
 
+
         dataDots
             .select(".dataDot")
+            .attr("id", (d) => d.properties.category)
             .attr("r", 3)
             .attr("cx", (d) => d.coords[0])
             .attr("cy", (d) => d.coords[1])
-            .attr("fill", "deeppink")
-            .attr("fill-opacity",0.2)
+            .attr("fill", (d) => categoryColors[d.properties.category])
+            .attr("fill-opacity",0.4)
             .attr("stroke","white")
             .attr("stroke-width",0.25);
 
