@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Figtree} from "next/font/google";
+import { Bebas_Neue} from "next/font/google";
 import "./globals.css";
 import React from "react";
 
-const figTree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
+const bebasNeue = Bebas_Neue({
+    weight: "400",
+    subsets: ["latin"],
+    variable: "--font-bebas",
 });
-
 
 export const metadata: Metadata = {
   title: "Knicker Map",
@@ -23,7 +23,7 @@ export default function RootLayout({
 
     <html lang="en">
       <body
-        className={`${figTree.variable} ${figTree.variable} antialiased`}
+        className={`${bebasNeue.variable} ${bebasNeue.variable} antialiased`}
       >
       <div className="w-screen overflow-x-auto">
         {children}

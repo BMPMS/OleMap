@@ -2,6 +2,8 @@
 import type { FC } from 'react';
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+// @ts-ignore
+import { geoRobinson } from "d3-geo-projection";
 
 type ScrollerMapChartProps = {
     containerClass: string;
@@ -23,9 +25,8 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
 
         const containerNode = d3.select<Element, unknown>(`.${containerClass}Container`).node();
         if (!containerNode) return;
-        const {  clientHeight, clientWidth } = containerNode;
-        const svgWidth = Math.max(clientWidth, 1280);
-        const svgHeight = Math.max(clientHeight,720);
+        const {  clientHeight: svgHeight, clientWidth:svgWidth } = containerNode;
+
 
         const margin = {left: 10, right: 10, top: 10, bottom: 10};
         baseSvg.attr('width', svgWidth)
@@ -39,7 +40,7 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
         // svg = parts which are affected by zoom
         const svg = baseSvg.select(".chartSvg");
 
-        const projection = d3.geoEqualEarth()
+        const projection = geoRobinson()
             .fitSize([chartWidth, chartHeight], geoJson);
 
         const path = d3.geoPath(projection);
