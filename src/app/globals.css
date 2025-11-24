@@ -41,11 +41,12 @@ body {
 
 article {
   position: relative;
+  pointer-events: none;
   padding: 0px;
   padding-top: 90vh;
   max-width: calc(max(40rem, 80vw));
   margin: 0 auto;
-  z-index: 50;
+  z-index: 500;
   gap: 4rem;  /* <--- guaranteed spacing between steps */
 }
 

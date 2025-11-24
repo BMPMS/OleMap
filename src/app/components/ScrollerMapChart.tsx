@@ -69,7 +69,7 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             10:"#df4256",
             2: "#f29943",
             5: "#1ba2db",
-            4: "#1ba2db",
+            4: "#a28773",
             1:"#fed000",
             3:"#aac316"
         }
@@ -89,10 +89,11 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             },[]);
 
 
+        debugger;
 
         const dataDots = svg
             .selectAll(".dataDots")
-            .data(dotData)
+            .data(dotData.filter((f) => f.properties.category === 5))
             .join((group) => {
                 const enter = group.append("g").attr("class", "dataDots");
                 enter.append("circle").attr("class", "dataDot");
@@ -110,7 +111,10 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             .attr("fill", (d) => categoryColors[d.properties.category])
             .attr("fill-opacity",0.4)
             .attr("stroke","white")
-            .attr("stroke-width",0.25);
+            .attr("stroke-width",0.25)
+            .on("mouseover", (event, d) => {
+                console.log(d.properties)
+            });
 
     }, [containerClass, geoJson,mapData]);
 
