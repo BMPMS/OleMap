@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import { Bebas_Neue} from "next/font/google";
 import "./globals.css";
 import React from "react";
+import localFont from 'next/font/local';
 
-const bebasNeue = Bebas_Neue({
-    weight: "400",
-    subsets: ["latin"],
+const bebasNeue = localFont({
+    src: [
+        { path: './fonts/BebasNeuePro-Regular.ttf', weight: '400' },
+        { path: './fonts/BebasNeuePro-Bold.ttf', weight: '700' }
+    ],
     variable: "--font-bebas",
-});
+})
 
 export const metadata: Metadata = {
   title: "Knicker Map",

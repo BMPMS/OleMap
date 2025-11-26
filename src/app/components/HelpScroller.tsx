@@ -1,15 +1,15 @@
 "use client"; // This marks the component to run on the client
 
-import React, {FC, useRef, useEffect, useState} from "react";
+import React, {FC, useRef, useEffect, useState, use} from "react";
 import scrollama, {DecimalType} from "scrollama";
 import * as d3 from "d3";
-import ScrollerMapChart from "@/app/components/ScrollerMapChart";
+import ScrollerMapChart, {CATEGORY_COLORS} from "@/app/components/ScrollerMapChart";
 import geoJson from "@/app/data/countriesNoAntarctica.json";
 import mapData from "@/app/data/mapData.json";
-import {generateNumberSvgs} from "@/app/components/InfoBoxCarousel";
+import panelData from "@/app/data/panelsData.json";
 import InfoBoxCarousel from "@/app/components/InfoBoxCarousel";
 
-const colors = {
+export const COLORS = {
     background: "#000000",
     darkbrown: "#A28774",
     lightbrown:"#D1C0AF",
@@ -31,6 +31,18 @@ const HelpScroller: FC<LegendChartProps> = ({
                                             }) => {
 
     const ref = useRef(null);
+    const allCategories = Object.keys(CATEGORY_COLORS).map((m) => +m);
+    const dataIds = panelData.map((m) => m.id);
+    const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set(allCategories));
+    const [selectedDotId, setSelectedDotId] = useState<number>(-1)
+    const [currentIndex, setCurrentIndex] = useState<number>(0);
+    const resetSelectedCategories = (latestCategories: Set<number>) => {
+        setSelectedCategories(latestCategories);
+    }
+
+    const resetSelectedDot = (currentId: number) => {
+        setSelectedDotId(currentId);
+    }
 
     useEffect(() => {
         // svgs and sizing
@@ -134,12 +146,19 @@ const HelpScroller: FC<LegendChartProps> = ({
                         .delay(500)
                         .duration(500)
                         .style("opacity",1);
+
+                    d3.select(".infoCarouselBackground")
+                        .transition()
+                        .delay(500)
+                        .duration(500)
+                        .style("opacity",1);
+                    setSelectedDotId(panelData[0].id);
                 }
             });
 
 
+    }, [helpScrollData,selectedCategories,selectedDotId]);
 
-    }, [helpScrollData]);
 
 
     return (
@@ -148,10 +167,10 @@ const HelpScroller: FC<LegendChartProps> = ({
             <figure>
                 <div className="rounded-lg m-6 shadow-[inset_0_0_104px_0_#ffffff8c] bg-black flex flex-col items-center py-12 px-6 w-[calc(100vw-3rem)] h-[calc(100vh-3rem)]">
                     <img src="/images/fingertap.png" className="scrollItems w-[20px] h-auto "/>
-                    <div style={{ color: colors.darkbrown }} className={`scrollItems  p-2 text-[16px] leading-[22px] tracking-[0.07em] text-center uppercase`}>
+                    <div style={{ color: COLORS.darkbrown }} className={`scrollItems  p-2 text-[16px] leading-[22px] tracking-[0.07em] text-center uppercase`}>
                         Nickelabbau
                     </div>
-                    <div style={{ color: colors.lightbrown }} className={`scrollItems  text-[32px] text-center uppercase`}>
+                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  text-[32px] text-center uppercase`}>
                         Umweltkonflikte um Energieressourcen
                     </div>
                     <div className={`text-[20px] leading-[27px] text-center scrollItems `}>
@@ -163,6 +182,9 @@ const HelpScroller: FC<LegendChartProps> = ({
                             containerClass={"d3Chart"}
                             geoJson={geoJson}
                             mapData={mapData}
+                            selectedCategories={selectedCategories}
+                            dataIds={dataIds}
+                            selectedDotId={selectedDotId}
                         />
                     </div>
                 </div>
@@ -170,7 +192,14 @@ const HelpScroller: FC<LegendChartProps> = ({
             <article>
             </article>
         </section>
-        <InfoBoxCarousel  items={generateNumberSvgs(12)} size={300} />
+        <InfoBoxCarousel
+            panelData={panelData}
+            size={355}
+            selectedCategories={selectedCategories}
+            setSelectedCategories={resetSelectedCategories}
+            startingIndex={currentIndex}
+            setSelectedDotId={setSelectedDotId}
+        />
     </>
     );
 };

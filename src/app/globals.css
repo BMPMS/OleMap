@@ -9,7 +9,7 @@
 :root {
   --background: #000000;
   --foreground: #ffffff;
-  --font-bebas: 'Bebas Neue', sans-serif;
+  --font-bebas:  var(--font-bebas)
 }
 
 /* Hide the Next.js development badge */
@@ -27,10 +27,12 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family:  var(--font-bebas);
 }
 
-
+svg {
+  font-family: var(--font-bebas)
+}
 
 #scrolly {
   font-family: var(--font-bebas), sans-serif;
@@ -85,4 +87,15 @@ figure {
   text-align: center;
   padding: 0.75rem;
   font-size: 1rem;
+}
+
+@keyframes pulse {
+  0% {transform: scale(1); opacity: 1}
+  50% {transform: scale(1.5); opacity: 0.5;}
+  100% {transform: scale(1); opacity: 1;}
+}
+
+.pulse {
+  animation: pulse 1s ease-in-out infinite;
+  transform-origin: center;
 }
