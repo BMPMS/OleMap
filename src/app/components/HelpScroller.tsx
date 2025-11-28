@@ -1,21 +1,25 @@
 "use client"; // This marks the component to run on the client
 
-import React, {FC, useRef, useEffect, useState, use} from "react";
+import React, {FC, useRef, useEffect, useState} from "react";
 import scrollama, {DecimalType} from "scrollama";
 import * as d3 from "d3";
-import ScrollerMapChart, {CATEGORY_COLORS} from "@/app/components/ScrollerMapChart";
+import ScrollerMapChart, {CATEGORY_COLORS, GeoJson} from "@/app/components/ScrollerMapChart";
 import geoJson from "@/app/data/countriesNoAntarctica.json";
 import mapData from "@/app/data/mapData.json";
 import panelData from "@/app/data/panelsData.json";
+import {MapData} from "@/app/components/ScrollerMapChart";
 import InfoBoxCarousel from "@/app/components/InfoBoxCarousel";
-
+import Carousel from "@/app/components/Carousel";
+import D3Carousel from "@/app/components/D3Carousel";
 export const COLORS = {
     background: "#000000",
     darkbrown: "#A28774",
     lightbrown:"#D1C0AF",
     white: "#FFFFFF"
-
 }
+
+const allCategories = Object.keys(CATEGORY_COLORS).map((m) => +m);
+
 export type ScrollData = {
     description: string[];
     stage: number;
@@ -30,18 +34,30 @@ const HelpScroller: FC<LegendChartProps> = ({
 
                                             }) => {
 
+    const basePath = process.env.NODE_ENV === 'production' ? '/OleMap' : '';
     const ref = useRef(null);
-    const allCategories = Object.keys(CATEGORY_COLORS).map((m) => +m);
     const dataIds = panelData.map((m) => m.id);
     const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set(allCategories));
     const [selectedDotId, setSelectedDotId] = useState<number>(-1)
-    const [currentIndex, setCurrentIndex] = useState<number>(0);
+    const [expanded, setExpanded] = useState<boolean>(false);
+    const [zoomEnabled, setZoomEnabled] = useState<boolean>(false);
+
+    const setCurrentExpanded = (newValue: boolean) => {
+        setExpanded(newValue);
+    }
     const resetSelectedCategories = (latestCategories: Set<number>) => {
         setSelectedCategories(latestCategories);
     }
 
     const resetSelectedDot = (currentId: number) => {
-        setSelectedDotId(currentId);
+        if(selectedDotId === currentId || currentId === -1){
+            setSelectedDotId(-1);
+            setCurrentExpanded(false);
+        } else {
+            setSelectedDotId(currentId);
+            const currentIndex = panelData.findIndex((f) => f.id === currentId);
+            setCurrentExpanded(true);
+        }
     }
 
     useEffect(() => {
@@ -69,8 +85,7 @@ const HelpScroller: FC<LegendChartProps> = ({
         stepGroup.select(".step")
             .attr("data-offset", (d, i) => i === 0 ? 1 : null)
             .attr("data-step",(d,i) => i + 1)
-            .style("margin-bottom",(d,i) => `${i === helpScrollData.length - 1 ? stepH * 2 : stepH/3}px`)
-
+            .style("margin-bottom",(d,i) => i === helpScrollData.length - 1 ? `${stepH * 1.5}px`:`${stepH/3}px`)
 
         stepGroup.select(".totalLabel")
             .style("position","absolute")
@@ -113,7 +128,7 @@ const HelpScroller: FC<LegendChartProps> = ({
 
             // 1. update height of step elements
             article.selectAll(".step")
-                .style("height", stepH + "px");
+                .style("height",  "auto");
 
             // 3. tell scrollama to update new element dimensions
             scroller.resize();
@@ -123,41 +138,39 @@ const HelpScroller: FC<LegendChartProps> = ({
         scroller
             .setup({
                 step: "#scrolly article .step",
-                offset: 0.33 as DecimalType,
+                offset: 0.5 as DecimalType,
                 debug: false,
             })
             .onStepEnter(handleStepEnter)
             .onStepExit((response) => {
-                if(response.index === 3){
+                if(response.index === 2){
                     d3.selectAll(".scrollItems")
+                        .interrupt()
                         .transition()
                         .duration(500)
                         .style("opacity",0)
                         .transition()
                         .duration(0)
                         .style("display","none")
-                    article.transition()
+                    article
+                        .interrupt()
+                        .transition()
                         .duration(500)
                         .style("opacity",0);
                     scroller.disable();
                     document.body.style.overflow = 'hidden';
-                    d3.select(".infoCarousel")
-                        .transition()
-                        .delay(500)
-                        .duration(500)
-                        .style("opacity",1);
-
-                    d3.select(".infoCarouselBackground")
-                        .transition()
-                        .delay(500)
-                        .duration(500)
-                        .style("opacity",1);
+                    setExpanded(true);
                     setSelectedDotId(panelData[0].id);
+                    const timer = d3.timer(() => {
+                        setZoomEnabled(true);
+                        timer.stop();
+                        },500)
+
                 }
             });
 
 
-    }, [helpScrollData,selectedCategories,selectedDotId]);
+    }, [helpScrollData,selectedCategories,selectedDotId,expanded]);
 
 
 
@@ -166,25 +179,27 @@ const HelpScroller: FC<LegendChartProps> = ({
         <section id="scrolly" ref={ref}>
             <figure>
                 <div className="rounded-lg m-6 shadow-[inset_0_0_104px_0_#ffffff8c] bg-black flex flex-col items-center py-12 px-6 w-[calc(100vw-3rem)] h-[calc(100vh-3rem)]">
-                    <img src="/images/fingertap.png" className="scrollItems w-[20px] h-auto "/>
+                    <img src={`${basePath}/images/fingertap.png`} className="scrollItems w-[20px] h-auto "/>
                     <div style={{ color: COLORS.darkbrown }} className={`scrollItems  p-2 text-[16px] leading-[22px] tracking-[0.07em] text-center uppercase`}>
-                        Nickelabbau
+                        INTERAKTIVE KARTE
                     </div>
-                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  text-[32px] text-center uppercase`}>
-                        Umweltkonflikte um Energieressourcen
+                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
+                        Umweltkonflikte um
                     </div>
-                    <div className={`text-[20px] leading-[27px] text-center scrollItems `}>
-                        in Abbau, Verarbeitung und Transport von Rohstoffen für die Energiewende, seit 1851 nach dem Global Atlas of Environmental Justice, Stand September 2025
+                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
+                        Energieressourcen
                     </div>
                     <br/>
                     <div className="d3ChartContainer w-full h-full">
                         <ScrollerMapChart
                             containerClass={"d3Chart"}
-                            geoJson={geoJson}
-                            mapData={mapData}
+                            geoJson={geoJson as GeoJson}
+                            mapData={mapData as MapData}
                             selectedCategories={selectedCategories}
                             dataIds={dataIds}
                             selectedDotId={selectedDotId}
+                            resetSelectedDot={resetSelectedDot}
+                            zoomEnabled={zoomEnabled}
                         />
                     </div>
                 </div>
@@ -192,15 +207,18 @@ const HelpScroller: FC<LegendChartProps> = ({
             <article>
             </article>
         </section>
-        <InfoBoxCarousel
+            <InfoBoxCarousel
             panelData={panelData}
             size={355}
             selectedCategories={selectedCategories}
             setSelectedCategories={resetSelectedCategories}
-            startingIndex={currentIndex}
+            selectedDot={selectedDotId}
             setSelectedDotId={setSelectedDotId}
+            expanded={expanded}
+            setExpanded={setCurrentExpanded}
         />
-    </>
+
+     </>
     );
 };
 

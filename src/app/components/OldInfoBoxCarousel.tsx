@@ -1,8 +1,7 @@
 "use client";
-import React, {useState, useRef, TouchEvent, MouseEvent, useEffect} from "react";
+import React, {useState, useRef, TouchEvent, MouseEvent} from "react";
 import InfoPanelChart, { InfoPanelData } from "@/app/components/InfoPanelChart";
 import {CATEGORY_COLORS, CATEGORY_NAMES} from "@/app/components/ScrollerMapChart";
-import D3Carousel from "@/app/components/D3Carousel";
 
 
 type InfoBoxCarouselProps = {
@@ -12,35 +11,91 @@ type InfoBoxCarouselProps = {
     size: number;
     selectedCategories: Set<number>;
     setSelectedCategories: (newList: Set<number>) => void;
-    selectedDot: number;
+    index: number;
+    setIndex: (newIndex: number) => void;
     setSelectedDotId: (newId: number) => void;
 };
 
 export default function InfoBoxCarousel({
     expanded,
-    selectedDot,
+    index,
     panelData,
     selectedCategories,
     setExpanded,
+    setIndex,
     setSelectedCategories,
     setSelectedDotId,
     size }: InfoBoxCarouselProps) {
 
     const basePath = process.env.NODE_ENV === 'production' ? '/OleMap' : '';
-    const [currentPanelData, setCurrentPanelData] = useState<InfoPanelData[]>(panelData)
+    // const [currentPanelData, setCurrentPanelData] = useState<InfoPanelData[]>(panelData)
     const [filterExpanded, setFilterExpanded] = useState(false);
 
-    const handleToggle = () => {
-        if(expanded){
-            setSelectedDotId(-1);
+    const touchStartX = useRef<number | null>(null);
+    const touchEndX = useRef<number | null>(null);
+
+    const total = panelData.length;
+
+    const resetIndex = (newIndex: number) => {
+
+        setIndex(newIndex);
+        setSelectedDotId(panelData[newIndex].id)
+    }
+    const next = () => {
+        if(index < total - 1){
+            resetIndex( index + 1)
+        };
+    }
+    const prev = () => {
+        if(index > 0){
+            resetIndex( index - 1);
         }
+    }
+
+    const handleToggle = () => {
         setExpanded(!expanded);
+        setSelectedDotId(expanded ? -1 : panelData[index].id)
         setFilterExpanded(false);
     }
 
     const handleFilterToggle = () => {
         setFilterExpanded(prev => !prev);
     }
+
+    const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+        touchStartX.current = e.changedTouches[0].clientX;
+    };
+
+    const onTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+        touchEndX.current = e.changedTouches[0].clientX;
+        handleSwipe();
+    };
+
+    const onMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+        touchStartX.current = e.clientX;
+    };
+
+    const onMouseUp = (e: MouseEvent<HTMLDivElement>) => {
+        touchEndX.current = e.clientX;
+        handleSwipe();
+    };
+
+    const handleSwipe = () => {
+        if (touchStartX.current === null || touchEndX.current === null) return;
+
+        const deltaX = touchStartX.current - touchEndX.current;
+
+        if (Math.abs(deltaX) > 40) {
+            if(deltaX > 0) {
+                next();
+            } else {
+                prev();
+            }
+        }
+
+        touchStartX.current = null;
+        touchEndX.current = null;
+    };
 
     const toggleCategory = (event: React.ChangeEvent<HTMLInputElement>) => {
         const {value} = event.target;
@@ -52,11 +107,6 @@ export default function InfoBoxCarousel({
             newSet.add(+value);
         }
         setSelectedCategories(newSet);
-        const filteredPanelData = panelData.filter((f) => newSet.has(f.category));
-        setCurrentPanelData(filteredPanelData);
-        if(selectedDot !== -1 && !filteredPanelData.find((f) => f.id === selectedDot)){
-            setSelectedDotId(-1);
-        }
     }
 
     const allFilterItems = Object.entries(CATEGORY_COLORS).reduce((acc, entry) => {
@@ -96,6 +146,7 @@ export default function InfoBoxCarousel({
 
     const closeInfoBox = () => {
         setExpanded(false);
+        setSelectedDotId(-1)
     }
 
     return (
@@ -112,7 +163,11 @@ export default function InfoBoxCarousel({
             {/* --- Carousel --- */}
             <div
                 className="infoCarousel transition-transform duration-500 ease-in-out fixed inset-x-0 bottom-5 z-[999] flex justify-center  transition-opacity duration-500"
-                 style={{
+                onTouchStart={onTouchStart}
+                onTouchEnd={onTouchEnd}
+                onMouseDown={onMouseDown}
+                onMouseUp={onMouseUp}
+                style={{
                     opacity: expanded ? 1 : 0,
                     transform: expanded || filterExpanded ? "translateY(0px)" : "translateY(350px)",
                 }}
@@ -175,8 +230,58 @@ export default function InfoBoxCarousel({
                             </div>
 
                         ) : (
-                            <div className="carouselContent fixed bottom-0 left-0  w-full h-[355px]">
-                                <D3Carousel panelWidthHeight={355} panelData={currentPanelData} selectedDotId={selectedDot} setSelectedDotId={setSelectedDotId}/>
+                            <div className="carouselContent relative w-full h-full">
+                                {/* --- Outgoing panels (previous items) --- */}
+                                <div className="absolute top-6 left-0 w-full h-full pointer-events-none flex items-center justify-end pr-[calc(100%+10px)] space-x-4">
+                                    {panelData.slice(0, index).map((item, i) => (
+                                        <div
+                                            key={i}
+                                            className="opacity-30 scale-90"
+                                            style={{ width: size, height: size }}
+                                        >
+                                            <InfoPanelChart
+                                                widthHeight={size}
+                                                panelData={item}
+                                                index={i}
+                                                total={total}
+                                                inFocus={"outgoing"}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="absolute top-6 left-0 w-full h-full pointer-events-none items-center justify-start pl-[calc(100%+10px)] space-x-4">
+                                    {panelData.slice(index + 1).map((item, i) => (
+                                        <div
+                                            key={i}
+                                            className="opacity-30 scale-90"
+                                            style={{
+                                                width: size,
+                                                height: size,
+                                                position: 'absolute',  // Ensure each upcoming panel is absolutely positioned
+                                                left: `${(i + 1) * (size + 10)}px`,  // Offset each panel horizontally
+                                            }}
+                                        >
+                                            <InfoPanelChart
+                                                widthHeight={size}
+                                                panelData={item}
+                                                index={index + 1 + i}
+                                                total={total}
+                                                inFocus={"incoming"}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* --- Current panel --- */}
+                                <div className="mainPanel pointer-events-auto w-full h-full flex items-center justify-center">
+                                    <InfoPanelChart
+                                        widthHeight={size}
+                                        panelData={panelData[index]}
+                                        index={index}
+                                        total={total}
+                                        inFocus={"middle"}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>

@@ -1,4 +1,6 @@
 import * as d3 from 'd3';
+import {BaseType} from "d3";
+import {InfoPanelData} from "@/app/components/D3Carousel";
 export const measureWidth = (text: string, fontSize: number) => {
     const context = document.createElement("canvas").getContext("2d");
     if(!context) return 0;
@@ -6,7 +8,7 @@ export const measureWidth = (text: string, fontSize: number) => {
     return context.measureText(text).width;
 }
 export const wrap = (
-    text: d3.Selection<SVGTextElement, unknown, HTMLElement, undefined>,
+    text: d3.Selection<BaseType, InfoPanelData, SVGGElement, undefined>,
     width: number,
     fontSize: number
 ): void => {
@@ -51,4 +53,24 @@ export const wrap = (
             }
         }
     });
+};
+
+
+export const zoomToDot = (
+    baseSvg: d3.Selection<SVGSVGElement, unknown, HTMLElement, undefined>,
+    zoom: d3.ZoomBehavior<SVGSVGElement, unknown>,
+    dotCoords: [number,number],
+    svgWidth: number,
+    svgHeight: number) => {
+
+    // Calculate the transform to center on (x, y) at the desired scale
+    const transform = d3.zoomIdentity
+        .translate(svgWidth / 2, svgHeight / 2) // move center of svg to 0,0
+        .scale(3)
+        .translate(-dotCoords[0], -dotCoords[1]); // move target point to center
+
+    // Animate the zoom
+    baseSvg.transition()
+        .duration(600)
+        .call(zoom.transform, transform);
 };

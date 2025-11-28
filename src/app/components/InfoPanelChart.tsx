@@ -1,9 +1,7 @@
 "use client"; // This marks the component to run on the client
 import type { FC } from 'react';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef} from 'react';
 import * as d3 from 'd3';
-// @ts-ignore
-import { geoRobinson } from "d3-geo-projection";
 import {CATEGORY_COLORS} from "@/app/components/ScrollerMapChart";
 import {COLORS} from "@/app/components/HelpScroller";
 import {measureWidth, wrap} from "@/app/components/sharedFunctions";
@@ -21,12 +19,14 @@ type InfoPanelChartProps = {
     panelData: InfoPanelData;
     index: number;
     total: number;
+    inFocus: "outgoing" | "middle" | "incoming";
 }
 const InfoPanelChart: FC<InfoPanelChartProps> = ({
     widthHeight,
                                                      panelData,
     index,
     total,
+    inFocus,
      }) => {
     const ref = useRef(null);
      const previousData = useRef<InfoPanelData | undefined>(undefined);
@@ -38,7 +38,8 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
         // svgs and sizing
         if (!ref.current) return;
         if(!panelData )return;
-        const direction = previousIndex.current < index ? "left" :"right";
+        const direction = previousIndex.current <= index ? "left" :"right";
+
          previousIndex.current = index;
 
         const svg = d3.select<SVGSVGElement, unknown>(ref.current);
@@ -53,17 +54,17 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
             .attr("font-weight",400)
             .attr("fill",COLORS.white)
             .attr("transform",`translate(${widthHeight/2},${widthHeight - (fontSize * 0.8)})`)
-            .text(`${index + 1}/${total}`);
+            .text(inFocus === "middle" ? `${index + 1}/${total}` : "");
 
         const arrowY = widthHeight - fontSize;
         svg.select(".lineArrowLeft")
-            .attr("stroke-width",0.5)
+            .attr("stroke-width",inFocus  === "middle"? 0.5 : 0)
             .attr("stroke",COLORS.white)
             .attr("marker-end", "url(#arrowDef)")
             .attr("d",`M${(widthHeight - countLabelWidth)/2},${arrowY} L${countLabelWidth/2},${arrowY}`);
 
         svg.select(".lineArrowRight")
-            .attr("stroke-width",0.5)
+            .attr("stroke-width",inFocus  === "middle"? 0.5 : 0)
             .attr("stroke",COLORS.white)
             .attr("marker-end", "url(#arrowDef)")
             .attr("d",`M${(widthHeight + countLabelWidth)/2},${arrowY} L${widthHeight - countLabelWidth/2},${arrowY}`);
@@ -82,9 +83,8 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
             .attr("stroke",COLORS.white)
             .attr("d","M1, -4L9,0L1,4")
 
-
         const populateBoxGroup = (
-            boxGroup:  d3.Selection<BaseType,unknown,HTMLElement,any>,
+            boxGroup:  d3.Selection<BaseType,unknown,HTMLElement,unknown>,
             boxGroupData: InfoPanelData
         ) => {
 
@@ -102,29 +102,6 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
             const bottomRight = -223.165 * proportion;
             const scaledTitlePath = `M0 0L${bottomLeft} 56.1302L${topRight} 45.3069L${bottomRight} 8.1128L0 0Z`;
 
-            boxGroup.select(".countryLabel")
-                .attr("text-anchor","middle")
-                .attr("font-size",fontSize)
-                .attr("font-weight",400)
-                .attr("fill",COLORS.white)
-                .attr("transform",`translate(${widthHeight/2},${fontSize})`)
-                .text(country.toUpperCase());
-
-            boxGroup.select(".titlePath")
-                .attr("fill",categoryColor)
-                .attr("stroke-width",0)
-                .attr("d",scaledTitlePath)
-                .attr("transform",`translate(${(labelWidth + widthHeight)/2},${fontSize})`);
-
-
-            boxGroup.select(".titleLabel")
-                .attr("text-anchor","middle")
-                .attr("font-size",titleFontSize)
-                .attr("font-weight",700)
-                .attr("fill",COLORS.white)
-                .attr("transform",`translate(${widthHeight/2},${fontSize + 32})`)
-                .text(title);
-
             boxGroup.select(".textLabel").selectAll("*").remove();
 
             boxGroup.select(".textLabel")
@@ -132,7 +109,6 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
                 .attr("font-size",bodySize)
                 .attr("font-weight",400)
                 .attr("fill",COLORS.white)
-                .attr("transform",`translate(${25},${bodySize + 85})`)
                 .text(text)
                 .call(wrap,widthHeight *1.25 ,bodySize);
 
@@ -145,19 +121,49 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
                 return `M353.778 0.771484L0.777954 10.4954L11.1081 ${bottomLeft}L346.224 ${bottomRight}L353.778 0.771484Z`
             }
 
+            const shiftDown = lineDifference > 2 ? (lineDifference - 2) * fontSize : 0;
+
+
+            boxGroup.select(".textLabel")
+                    .attr("transform",`translate(${25},${bodySize + 85 + shiftDown})`)
+
+            boxGroup.select(".countryLabel")
+                .attr("text-anchor","middle")
+                .attr("font-size",fontSize)
+                .attr("font-weight",400)
+                .attr("fill",COLORS.white)
+                .attr("transform",`translate(${widthHeight/2},${fontSize + shiftDown})`)
+                .text(country.toUpperCase());
+
+            boxGroup.select(".titlePath")
+                .attr("fill",categoryColor)
+                .attr("stroke-width",0)
+                .attr("d",scaledTitlePath)
+                .attr("transform",`translate(${(labelWidth + widthHeight)/2},${fontSize + shiftDown})`);
+
+
+            boxGroup.select(".titleLabel")
+                .attr("text-anchor","middle")
+                .attr("font-size",titleFontSize)
+                .attr("font-weight",700)
+                .attr("fill",COLORS.white)
+                .attr("transform",`translate(${widthHeight/2},${fontSize + 32 + shiftDown})`)
+                .text(title);
+
             boxGroup.select(".boxPath")
                 .attr("fill",COLORS.background)
                 .attr("stroke", categoryColor)
                 .attr("stroke-width",1)
                 .attr("d",scaledContainerPath)
-                .attr("transform",`translate(0,${fontSize + 28})`);
+                .attr("transform",`translate(0,${fontSize + 28  + shiftDown})`);
         }
         const transitionTime = 400;
 
         const currentBoxGroup = svg.select(".currentBoxGroup");
         populateBoxGroup(currentBoxGroup,panelData);
+
         currentBoxGroup
-            .attr("transform",`translate(${direction === "left" ? widthHeight : -widthHeight},0)`)
+            .attr("transform",`translate(${direction === "left" ? widthHeight : -widthHeight},${widthHeight * 0.2})`)
             .interrupt()
             .transition()
             .duration(transitionTime)
@@ -172,13 +178,13 @@ const InfoPanelChart: FC<InfoPanelChartProps> = ({
             .transition()
             .duration(transitionTime)
             .attr("opacity",0)
-            .attr("transform",`translate(${direction === "left" ? -widthHeight : widthHeight},0)`)
+            .attr("transform",`translate(${direction === "left" ? -widthHeight : widthHeight},${widthHeight * 0.2})`)
             .on("end", () => {
                 previousData.current = panelData;
                 populateBoxGroup(previousBoxGroup,panelData);
             });
 
-    }, [widthHeight, panelData]);
+    }, [ index, inFocus, panelData,total, widthHeight]);
 
     return (
         <svg className={"noselect"} ref={ref}>
