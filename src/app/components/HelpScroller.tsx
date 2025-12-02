@@ -3,14 +3,14 @@
 import React, {FC, useRef, useEffect, useState} from "react";
 import scrollama, {DecimalType} from "scrollama";
 import * as d3 from "d3";
-import ScrollerMapChart, {CATEGORY_COLORS, GeoJson} from "@/app/components/ScrollerMapChart";
+import ScrollerMapChart, {CATEGORY_COLORS, GeoJson, MapData} from "@/app/components/ScrollerMapChart";
 import geoJson from "@/app/data/countriesNoAntarctica.json";
 import mapData from "@/app/data/mapData.json";
 import panelData from "@/app/data/panelsData.json";
-import {MapData} from "@/app/components/ScrollerMapChart";
 import InfoBoxCarousel from "@/app/components/InfoBoxCarousel";
-import Carousel from "@/app/components/Carousel";
-import D3Carousel from "@/app/components/D3Carousel";
+
+export const MAP_TRANSITION = 800;
+
 export const COLORS = {
     background: "#000000",
     darkbrown: "#A28774",
@@ -41,7 +41,9 @@ const HelpScroller: FC<LegendChartProps> = ({
     const [selectedDotId, setSelectedDotId] = useState<number>(-1)
     const [expanded, setExpanded] = useState<boolean>(false);
     const [zoomEnabled, setZoomEnabled] = useState<boolean>(false);
-
+    const [scrolling, setScrolling] = useState<boolean>(true)
+    const savedScrollPositions = useRef<{[key:number]:number}>({});
+    const currentScroller = useRef<scrollama.ScrollamaInstance | undefined>(undefined)
     const setCurrentExpanded = (newValue: boolean) => {
         setExpanded(newValue);
     }
@@ -50,14 +52,34 @@ const HelpScroller: FC<LegendChartProps> = ({
     }
 
     const resetSelectedDot = (currentId: number) => {
-        if(selectedDotId === currentId || currentId === -1){
-            setSelectedDotId(-1);
-            setCurrentExpanded(false);
-        } else {
-            setSelectedDotId(currentId);
-            const currentIndex = panelData.findIndex((f) => f.id === currentId);
-            setCurrentExpanded(true);
+
+        setSelectedDotId(currentId);
+        setCurrentExpanded(currentId !== -1);
+
+    }
+
+    const backToScroll = () => {
+        d3.select(".infoCarousel").style("opacity",0);
+        document.body.style.overflow = 'auto';
+        if(currentScroller.current){
+            currentScroller.current.enable();
         }
+        window.scrollTo(0, savedScrollPositions.current[1] + (savedScrollPositions.current[2]/4))
+        d3.selectAll(".scrollItems")
+            .style("opacity",1)
+            .style("display","block");
+
+        d3.selectAll(".step")
+            .style("opacity",1);
+
+        d3.select(".mapSvg").style("opacity",1);
+        d3.select(".d3ChartContainer")
+            .classed("scrollFinished",false);
+        d3.selectAll(".dataDot")
+            .classed("pulse", true);
+        setSelectedDotId(-1);
+        setZoomEnabled(false);
+        setScrolling(true);
     }
 
     useEffect(() => {
@@ -65,109 +87,83 @@ const HelpScroller: FC<LegendChartProps> = ({
         if (!ref.current) return;
         // initialize the scrollama
         const scroller = scrollama();
-        let stepH = Math.floor(window.innerHeight * 0.35);
+        currentScroller.current = scroller;
 
         const scrolly = d3.select<SVGSVGElement,unknown>(ref.current);
         const article = scrolly.select("article");
 
-        const stepGroup = article
-            .selectAll(".scrollSteps")
-            .data(helpScrollData)
-            .join((group) => {
+        if(scrolling){
+            const stepGroup = article
+                .selectAll(".scrollSteps")
+                .data( helpScrollData)
+        .join((group) => {
                 const enter = group.append("g").attr("class", "scrollSteps");
                 const step = enter.append("div").attr("class", "step");
-                step.append("span").attr("class","totalLabel");
                 step.append("g").attr("class","stepContentGroup")
 
                 return enter;
             });
 
-        stepGroup.select(".step")
-            .attr("data-offset", (d, i) => i === 0 ? 1 : null)
-            .attr("data-step",(d,i) => i + 1)
-            .style("margin-bottom",(d,i) => i === helpScrollData.length - 1 ? `${stepH * 1.5}px`:`${stepH/3}px`)
+            stepGroup.select(".step")
+                .attr("class", (d,i) => i === 0 ? "step": "step categories")
+                .attr("data-step",(d,i) => i + 1)
 
-        stepGroup.select(".totalLabel")
-            .style("position","absolute")
-            .style("right","2rem")
-            .style("font-size","0.6rem")
-            .html((d,i) => `${i + 1}/${helpScrollData.length}`)
+            const stepContentGroup = stepGroup.select(".stepContentGroup")
+                .selectAll<SVGGElement,{text: string, showButton: boolean}[]>(".stepDescriptions")
+                .data(d => d.description)
+                .join((group) => {
+                    const enter = group.append("g").attr("class", "stepDescriptions");
+                    enter.append("p").attr("class","stepContent");
+                    return enter;
+                });
 
-        const stepContentGroup = stepGroup.select(".stepContentGroup")
-            .selectAll<SVGGElement,{text: string, showButton: boolean}[]>(".stepDescriptions")
-            .data(d => d.description)
-            .join((group) => {
-                const enter = group.append("g").attr("class", "stepDescriptions");
-                enter.append("p").attr("class","stepContent");
-                return enter;
-            });
+            stepContentGroup.select(".stepContent")
+                .attr("id",(d,i) => `stepContent${i}`)
+                .html((d) => `${d}`);
 
-        stepContentGroup.select(".stepContent")
-            .attr("id",(d,i) => `stepContent${i}`)
-            .html((d) => `${d}`);
+            scroller
+                .setup({
+                    step: "#scrolly article .step",
+                    offset: 1 as DecimalType,
+                    debug: false,
+                    progress:true
+                })
+                .onStepExit((response) => {
+                      savedScrollPositions.current[response.index] = window.scrollY;
+                      if(response.index === 2 && response.direction === "down"){
+                        d3.selectAll(".scrollItems")
+                            .style("opacity",0)
+                            .style("display","none");
 
+                        d3.selectAll(".step")
+                            .style("opacity",0);
 
-        type ScrollEnterResponse = {
-            direction: string;
-            element: HTMLElement;
-            index: number;
+                        d3.select(".mapSvg")
+                            .style("opacity",0);
+
+                        scroller.disable();
+                        document.body.style.overflow = 'hidden';
+                        setScrolling(false);
+                        let ticker = 0
+                        const interval = setInterval(() => {
+                            d3.select(".infoCarousel").style("opacity",1);
+                            setExpanded(true);
+                            setSelectedDotId(panelData[0].id);
+                            d3.select(".d3ChartContainer")
+                                .classed("scrollFinished",true);
+                            d3.selectAll(".dataDot")
+                                .classed("pulse", false);
+                            if(ticker === 2){
+                                setZoomEnabled(true);
+                                clearInterval(interval)
+                            }
+                            ticker += 1;
+                        },MAP_TRANSITION)
+
+                    }
+                });
         }
 
-        // scrollama event handlers
-        function handleStepEnter(response: ScrollEnterResponse) {
-            // set current step as active (and fixed?)
-            article.selectAll(".step")
-                .classed("is-active",  (d, i) => i === response.index);
-
-        }
-
-        // generic window resize listener event
-        const  handleResize = () =>  {
-            const halfHeight = Math.floor(window.innerHeight * 0.5);
-            stepH = Math.min(halfHeight,200);
-
-            // 1. update height of step elements
-            article.selectAll(".step")
-                .style("height",  "auto");
-
-            // 3. tell scrollama to update new element dimensions
-            scroller.resize();
-        }
-
-        handleResize();
-        scroller
-            .setup({
-                step: "#scrolly article .step",
-                offset: 0.5 as DecimalType,
-                debug: false,
-            })
-            .onStepEnter(handleStepEnter)
-            .onStepExit((response) => {
-                if(response.index === 2){
-                    d3.selectAll(".scrollItems")
-                        .interrupt()
-                        .transition()
-                        .duration(500)
-                        .style("opacity",0)
-                        .transition()
-                        .duration(0)
-                        .style("display","none")
-                    article
-                        .interrupt()
-                        .transition()
-                        .duration(500)
-                        .style("opacity",0);
-                    scroller.disable();
-                    document.body.style.overflow = 'hidden';
-                    setExpanded(true);
-                    setSelectedDotId(panelData[0].id);
-                    const timer = d3.timer(() => {
-                        setZoomEnabled(true);
-                        timer.stop();
-                        },500)
-
-                }
-            });
 
 
     }, [helpScrollData,selectedCategories,selectedDotId,expanded]);
@@ -178,29 +174,33 @@ const HelpScroller: FC<LegendChartProps> = ({
         <>
         <section id="scrolly" ref={ref}>
             <figure>
-                <div className="rounded-lg m-6 shadow-[inset_0_0_104px_0_#ffffff8c] bg-black flex flex-col items-center py-12 px-6 w-[calc(100vw-3rem)] h-[calc(100vh-3rem)]">
-                    <img src={`${basePath}/images/fingertap.png`} className="scrollItems w-[20px] h-auto "/>
-                    <div style={{ color: COLORS.darkbrown }} className={`scrollItems  p-2 text-[16px] leading-[22px] tracking-[0.07em] text-center uppercase`}>
-                        INTERAKTIVE KARTE
-                    </div>
-                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
-                        Umweltkonflikte um
-                    </div>
-                    <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
-                        Energieressourcen
-                    </div>
-                    <br/>
-                    <div className="d3ChartContainer w-full h-full">
-                        <ScrollerMapChart
-                            containerClass={"d3Chart"}
-                            geoJson={geoJson as GeoJson}
-                            mapData={mapData as MapData}
-                            selectedCategories={selectedCategories}
-                            dataIds={dataIds}
-                            selectedDotId={selectedDotId}
-                            resetSelectedDot={resetSelectedDot}
-                            zoomEnabled={zoomEnabled}
-                        />
+                <div className="bg-black flex  justify-center items-center w-screen h-screen">
+                    <div className="w-screen flex flex-col justify-center items-center h-auto">
+                        <img src={`${basePath}/images/fingertap.png`} className="scrollItems w-[20px] h-auto "/>
+                        <div style={{ color: COLORS.darkbrown }} className={`scrollItems  p-2 text-[16px] leading-[22px] tracking-[0.07em] text-center uppercase`}>
+                            INTERAKTIVE KARTE
+                        </div>
+                        <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
+                            Umweltkonflikte um
+                        </div>
+                        <div style={{ color: COLORS.lightbrown }} className={`scrollItems  font-extrabold italic p-0 m-0 leading-[40px] text-[40px] text-center uppercase`}>
+                            Energieressourcen
+                        </div>
+                        <br/>
+                        <div className="d3ChartContainer">
+                            <ScrollerMapChart
+                                containerClass={"d3Chart"}
+                                geoJson={geoJson as GeoJson}
+                                mapData={mapData as MapData}
+                                selectedCategories={selectedCategories}
+                                dataIds={dataIds}
+                                selectedDotId={selectedDotId}
+                                resetSelectedDot={resetSelectedDot}
+                                zoomEnabled={zoomEnabled}
+                                expanded={expanded}
+                                scrolling={scrolling}
+                            />
+                        </div>
                     </div>
                 </div>
             </figure>
@@ -216,6 +216,7 @@ const HelpScroller: FC<LegendChartProps> = ({
             setSelectedDotId={setSelectedDotId}
             expanded={expanded}
             setExpanded={setCurrentExpanded}
+            handleBackToScroll={backToScroll}
         />
 
      </>

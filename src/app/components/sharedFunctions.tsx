@@ -61,16 +61,27 @@ export const zoomToDot = (
     zoom: d3.ZoomBehavior<SVGSVGElement, unknown>,
     dotCoords: [number,number],
     svgWidth: number,
-    svgHeight: number) => {
+    svgHeight: number,
+    expanded: boolean) => {
+
+    const overlayHeight = 355;
+    const visibleHeight = svgHeight - overlayHeight;
+    const visibleCenterY = visibleHeight / 2;
 
     // Calculate the transform to center on (x, y) at the desired scale
     const transform = d3.zoomIdentity
-        .translate(svgWidth / 2, svgHeight / 2) // move center of svg to 0,0
+        .translate(svgWidth / 2, expanded ? visibleCenterY/2 : svgHeight/2) // move center of svg to 0,0
         .scale(3)
-        .translate(-dotCoords[0], -dotCoords[1]); // move target point to center
+        .translate(-dotCoords[0], -dotCoords[1])
+        //.translate(0,-overlayHeight/2)
 
-    // Animate the zoom
-    baseSvg.transition()
-        .duration(600)
-        .call(zoom.transform, transform);
+    queueMicrotask(() => {
+        // Animate the zoom
+        baseSvg.transition()
+            .duration(600)
+            .style("opacity",1)
+            .call(zoom.transform, transform);
+    })
+
 };
+

@@ -4,7 +4,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import * as d3 from 'd3';
 // @ts-expect-error no typescript for this projection
 import { geoRobinson } from "d3-geo-projection";
-import type { Feature, Geometry, Point } from "geojson";
+import type {Feature, Geometry, Point} from "geojson";
 import {zoomToDot} from "@/app/components/sharedFunctions";
 
 type MapProperty = {
@@ -22,6 +22,11 @@ type MapProperty = {
     "commodity": string[],
     "company": string[],
     "type": string[]
+}
+
+export type MapData = {
+    type: string;
+    features: Feature<Point,MapProperty>[]
 }
 
 type GeoJsonProperty = {
@@ -48,11 +53,6 @@ export const CATEGORY_COLORS = {
     3:"#AAC315"
 }
 
-export type MapData = {
-    type: string;
-    features: Feature<Point,MapProperty>[]
-}
-
 export type GeoJson = {
     type: string;
     features: Feature<Geometry,GeoJsonProperty>[]
@@ -68,23 +68,28 @@ export const CATEGORY_NAMES = {
 }
 type ScrollerMapChartProps = {
     containerClass: string;
-    geoJson: GeoJson;
-    mapData: MapData;
-    selectedCategories: Set<number>;
     dataIds: number[];
+    mapData: MapData;
+    expanded: boolean;
+    geoJson: GeoJson;
+    scrolling: boolean;
+    selectedCategories: Set<number>;
     selectedDotId: number;
     resetSelectedDot: (currentId: number) => void;
-    zoomEnabled: boolean
+    zoomEnabled: boolean;
+
 }
 const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
-    containerClass,
-    geoJson,
-    mapData,
-    dataIds,
-    resetSelectedDot,
-    selectedDotId,
-                                                     selectedCategories,
-                                                     zoomEnabled}) => {
+            containerClass,
+            mapData,
+            dataIds,
+            expanded,
+            geoJson,
+            resetSelectedDot,
+            scrolling,
+            selectedDotId,
+            selectedCategories,
+            zoomEnabled}) => {
     const ref = useRef(null);
     const [tick, setTick] = useState(0);
     // Modified hook that returns the tick value
@@ -103,13 +108,16 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
 
         const containerNode = d3.select<Element, unknown>(`.${containerClass}Container`).node();
         if (!containerNode) return;
-        const {  clientHeight: svgHeight, clientWidth:svgWidth } = containerNode;
+
+        const { clientWidth:svgWidth, clientHeight } = containerNode;
+
+        const svgHeight = scrolling ? svgWidth * 0.525 : clientHeight;
+
 
         const margin = {left: 10, right: 10, top: 10, bottom: 10};
 
-        baseSvg
-            .attr('width', svgWidth)
-            .attr('height', svgHeight);
+         baseSvg.attr('width', svgWidth)
+           .attr('height', svgHeight);
 
         const zoom = d3
             .zoom<SVGSVGElement, unknown>()
@@ -158,82 +166,78 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
             .attr("stroke","#A0A0A0")
             .attr("d", path);
 
-        const categories = Object.keys(CATEGORY_COLORS)
-            .map((m) => +m);
-
-        const dotData = mapData.features
+        const chartData =  mapData.features
             .filter((f) => f.geometry.type === "Point")
+            .filter((f) => selectedCategories.has(f.properties.category))
             .reduce((acc, entry) => {
                 if(entry.properties && entry.geometry){
-                    if(categories.includes(entry.properties.category) && selectedCategories.has(entry.properties.category)){
-                        const coords = projection(entry.geometry.coordinates as [number,number]);
-                        if(coords !== null){
-                            acc.push({
-                                coords,
-                                properties: entry.properties
-                            })
-                        }
+                    const coords = projection(entry.geometry.coordinates as [number,number]);
+                    if(coords !== null){
+                        acc.push({
+                            coords,
+                            id: entry.properties.id,
+                            category: entry.properties.category
+                        })
                     }
                 }
                 return acc;
-            },[] as {coords: [number,number], properties: MapProperty}[])
+            },[] as {coords: [number,number], id: number, category: number}[])
             .sort((a,b) =>
-                d3.descending(dataIds.includes(a.properties.id) ? 0 : 1, dataIds.includes(b.properties.id) ? 0 : 1))
+                d3.descending(dataIds.includes(a.id) ? 0 : 1, dataIds.includes(b.id) ? 0 : 1))
 
-
-        if(selectedDotId === -1){
-            baseSvg.transition()
-                .duration(600)
-                .call(zoom.transform, d3.zoomIdentity);
-        } else {
-            const selectedDot = dotData.find((f) => f.properties.id === selectedDotId);
+        if(selectedDotId !== -1){
+            const selectedDot = chartData.find((f) => f.id === selectedDotId);
             if(selectedDot){
-                zoomToDot(baseSvg,zoom,selectedDot.coords,svgWidth,svgHeight);
+                zoomToDot(baseSvg,zoom,selectedDot.coords as [number,number],svgWidth,svgHeight,expanded);
             }
+        } else if (scrolling){
+            baseSvg.call(zoom.transform, d3.zoomIdentity);
         }
-
         const dataDots = svg
             .selectAll(".dataDots")
-            .data(dotData)
+            .data(chartData)
             .join((group) => {
                 const enter = group.append("g").attr("class", "dataDots");
+                enter.append("circle").attr("class", "dataOuterDot pulse");
                 enter.append("circle").attr("class", "dataDot");
-                enter.append("circle").attr("class", "dataOuterDot");
                 return enter;
             });
         dataDots.attr("transform", `translate(${margin.left},${margin.right})`);
 
         dataDots
             .select(".dataOuterDot")
-            .attr("display",(d) => selectedDotId === -1 || selectedDotId === d.properties.id ? "block" : "none")
-            .attr("class",(d) =>  dataIds.includes(d.properties.id) ? "dataOuterDot pulse" : "dataOuterDot")
-            .attr("r", (d) => dataIds.includes(d.properties.id) ? 6 : 0)
+            .attr("visibility",(d) => !scrolling && (!expanded || selectedDotId === d.id) ? "visible" : "hidden")
+            .attr("display",(d) =>  dataIds.includes(d.id) ? "block" : "none")
+            .attr("r", (d) => !expanded || selectedDotId === d.id ? 5 : 0)
             .attr("cx", (d) => d.coords[0])
             .attr("cy", (d) => d.coords[1])
-            .attr("fill", "transparent")
-            .attr("stroke", (d) => CATEGORY_COLORS[d.properties.category as keyof typeof CATEGORY_COLORS])
-            .attr("fill-opacity",(d) => dataIds.includes(d.properties.id) ? 1 : 0.4)
-            .attr("stroke-width",(d) => dataIds.includes(d.properties.id) ? 1.5 : 0)
-            .attr("cursor", (d) => dataIds.includes(d.properties.id) ? "pointer" : "default")
+            .attr("fill", (d) => CATEGORY_COLORS[d.category as keyof typeof CATEGORY_COLORS])
+            .attr("fill-opacity",0.5)
+            .attr("stroke-width",0)
+            .attr("cursor", (d) => dataIds.includes(d.id) ? "pointer" : "default")
             .on("click", (event, d) => {
-                if(dataIds.includes(d.properties.id)){
-                    resetSelectedDot(d.properties.id);
+                if(dataIds.includes(d.id)){
+                    resetSelectedDot(d.id);
                 }
             })
 
+        const standardRadius = svgWidth < 769 ? 1 : 2;
+        const panelRadius = svgWidth < 769 ? 1.5 : 3;
+
         dataDots
             .select(".dataDot")
-            .attr("r", (d) => dataIds.includes(d.properties.id)  ? 4 : 2)
+            .attr("class", scrolling ? "dataDot pulse" : "dataDot")
+            .attr("r",  (d) => dataIds.includes(d.id) ? panelRadius : standardRadius)
             .attr("cx", (d) => d.coords[0])
             .attr("cy", (d) => d.coords[1])
-            .attr("fill", (d) => CATEGORY_COLORS[d.properties.category as keyof typeof CATEGORY_COLORS])
+            .attr("fill", (d) => CATEGORY_COLORS[d.category as keyof typeof CATEGORY_COLORS])
           //  .attr("fill",  (d) => dataIds.includes(d.properties.id) ? CATEGORY_COLORS[d.properties.category as keyof typeof CATEGORY_COLORS] : "#808080")
-            .attr("fill-opacity",(d) => dataIds.includes(d.properties.id)  ? 1 : 0.2)
+            .attr("fill-opacity",(d) => dataIds.includes(d.id)  ? 1 : 0.2)
             .attr("stroke-width",0)
-            .attr("cursor", (d) => dataIds.includes(d.properties.id) ? "pointer" : "default")
+            .attr("cursor", (d) => dataIds.includes(d.id) ? "pointer" : "default")
             .on("click", (event, d) => {
-                if(dataIds.includes(d.properties.id)){
-                    resetSelectedDot(d.properties.id);
+                if(dataIds.includes(d.id)){
+                    resetSelectedDot(d.id);
                 }
             });
 
@@ -244,10 +248,10 @@ const ScrollerMapChart: FC<ScrollerMapChartProps> = ({
         })
 
 
-    }, [containerClass, dataIds, geoJson,mapData,resetSelectedDot, selectedCategories,selectedDotId,tick]);
+    }, [containerClass, dataIds, expanded, geoJson,mapData,resetSelectedDot, scrolling,selectedCategories,selectedDotId,tick]);
 
     return (
-        <svg className={"noselect"} ref={ref}>
+        <svg className={"noselect mapSvg"} ref={ref}>
             <g className={"chartSvg"}>
             </g>
         </svg>

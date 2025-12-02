@@ -47,13 +47,13 @@ const D3Carousel: FC<D3CarouselProps> = ({
         const {  clientHeight: svgHeight, clientWidth:svgWidth } = containerNode;
         svg
             .attr('width', svgWidth)
-            .attr('height', svgHeight);
+            .attr('height', svgHeight)
+            .attr("xmlns","http://www.w3.org/2000/svg");
 
-        const selectedPanelDataId = selectedDotId === -1 ? 0 : selectedDotId;
+        const selectedPanelDataId = selectedDotId === -1 ? panelData[0].id : selectedDotId;
         const selectedPanelIndex = selectedDotId === -1 ? 0 : panelData.findIndex((f) => f.id === selectedPanelDataId);
         const extraTop = panelWidthHeight * 0.2;
-
-        let panelStart = (svgWidth - panelWidthHeight)/2;
+        const panelStart = (svgWidth - panelWidthHeight)/2;
         const fontSize = 16;
         const bodySize = 17;
         const titleFontSize = 22;
@@ -70,14 +70,11 @@ const D3Carousel: FC<D3CarouselProps> = ({
                 panelGroup.append("path").attr("class", "titlePath");
                 panelGroup.append("text").attr("class", "titleLabel");
                 panelGroup.append("text").attr("class", "textLabel");
-                const progressGroup = enter.append("g").attr("class","progressGroup")
-                progressGroup.append("text").attr("class", "progressCount");
-                progressGroup.append("path").attr("class", "lineArrowLeft");
-                progressGroup.append("path").attr("class", "lineArrowRight");
                 return enter;
             });
 
-        panelsGroup.attr("pointer-events","none");
+        panelsGroup.select(".panelGroup")
+            .attr("pointer-events","none");
 
         panelsGroup.select(".textLabel").selectAll("*").remove();
 
@@ -145,68 +142,35 @@ const D3Carousel: FC<D3CarouselProps> = ({
             .attr("d",(d) => scaledContainerPath(d.lineDifference || 0))
             .attr("transform",`translate(0,${fontSize + 28})`);
 
-        const countLabelWidth = 40;
-
-        panelsGroup.select(".progressCount")
-            .attr("text-anchor","middle")
-            .attr("font-size",fontSize * 0.8)
-            .attr("font-weight",400)
-            .attr("fill",COLORS.white)
-            .attr("transform",`translate(${panelWidthHeight/2},${panelWidthHeight - (fontSize * 0.8)})`)
-            .text((d,i) =>  `${i + 1}/${panelData.length}`);
-
-        const arrowY = panelWidthHeight - fontSize;
-
-        panelsGroup.select(".lineArrowLeft")
-            .attr("stroke-width", 0.5)
-            .attr("stroke",COLORS.white)
-            .attr("marker-end", (d,i) => i === 0 ? "" : "url(#arrowDef)")
-            .attr("d",`M${(panelWidthHeight - countLabelWidth)/2},${arrowY} L${countLabelWidth/2},${arrowY}`);
-
-        panelsGroup.select(".lineArrowRight")
-            .attr("stroke-width", 0.5)
-            .attr("stroke",COLORS.white)
-            .attr("marker-end", (d,i) => i === panelData.length - 1 ? "" : "url(#arrowDef)")
-            .attr("d",`M${(panelWidthHeight + countLabelWidth)/2},${arrowY} L${panelWidthHeight - countLabelWidth/2},${arrowY}`);
-
         const panelX = -(selectedPanelIndex * panelWidthHeight);
 
         const setGroupStyles = (currentPanelId: number, currentPanelIndex: number, transitionTime: number) => {
 
-            panelsGroup.select(".progressGroup")
-                .interrupt()
-                .transition()
-                .duration(transitionTime)
-                .attr("opacity", (d) => d.id === currentPanelId ? 1 : 0)
-                .attr("transform",(d,i) => `translate(${panelStart + (i * panelWidthHeight)},${d.id === currentPanelId ? 0 : extraTop}) scale(${d.id === currentPanelId ? 1 : 0.9})`)
-
-            panelsGroup.select(".panelGroup")
-                .interrupt()
+            svg.selectAll<SVGGElement,InfoPanelData>(".panelGroup")
                 .transition()
                 .duration(transitionTime)
                 .attr("opacity", (d) => d.id === currentPanelId ? 1 : 0.2)
                 .attr("transform",(d,i) => `translate(${panelStart + (i * panelWidthHeight)},${(d.panelTop || 0) + (d.id === currentPanelId ? 0 : extraTop)}) scale(${d.id === currentPanelId ? 1 : 0.9})`)
 
             const currentPanelX = -(currentPanelIndex * panelWidthHeight)
-            panelsGroup
-                .interrupt()
+            svg.selectAll(".panelsGroup")
                 .transition()
                 .duration(transitionTime)
-                .attr("transform",(d,i) => `translate(${currentPanelX},0)`);
-
+                .attr("transform", `translate(${currentPanelX},0)`);
         }
 
-        setGroupStyles(selectedPanelDataId, selectedPanelIndex,0);
-
+        queueMicrotask(() => {
+            setGroupStyles(selectedPanelDataId, selectedPanelIndex,0);
+        })
 
 
         let startX = 0;
         let dragDisabled = false;
-        const dragStart = ((event: D3DragEvent<any, any, any>) => {
+        const dragStart = ((event: D3DragEvent<SVGSVGElement, undefined, undefined>) => {
             svg.attr("cursor","grabbing");
             startX = event.x;
         })
-        const dragging = ((event: D3DragEvent<any, any, any>) => {
+        const dragging = ((event: D3DragEvent<SVGSVGElement, undefined, undefined>) => {
             if(!dragDisabled){
                 const dragPosition = startX - event.x;
                 if(selectedPanelIndex === 0 &&  dragPosition < 0) return;
@@ -215,16 +179,16 @@ const D3Carousel: FC<D3CarouselProps> = ({
                     const direction = event.x > startX ? -1: 1;
                     const newDotId = panelData[selectedPanelIndex + direction].id;
                     dragDisabled = true;
-                    setGroupStyles(newDotId,selectedPanelIndex + direction,200);
+                    queueMicrotask(() => {
+                        setGroupStyles(newDotId,selectedPanelIndex + direction,500);
+                    })
                     const timer = d3.timer(() => {
                         timer.stop();
                         setSelectedDotId(newDotId);
-                    },200)
+                    },500)
 
                 } else if (!dragDisabled){
-                    panelsGroup.attr("transform",(d,i) =>
-                        `translate(${panelX - dragPosition},0)`);
-
+                    panelsGroup.attr("transform", `translate(${panelX - dragPosition},0)`);
                 }
             }
         })
@@ -234,8 +198,40 @@ const D3Carousel: FC<D3CarouselProps> = ({
             svg.attr("cursor","grab");
         })
 
+        const carouselClick = (newIndex: number) => {
+            dragDisabled = true;
+            const newDotId = panelData[newIndex].id;
+            //queueMicrotask(() => {
+            setGroupStyles(newDotId,newIndex,500);
+            const timer = d3.timer(() => {
+                    timer.stop();
+                    setSelectedDotId(newDotId);
+                },500)
+            //})
+
+        }
+
+        const getClickIndex = (layerX: number) => {
+            if(layerX < (svgWidth - panelWidthHeight)/2){
+                // clicking left
+                return selectedPanelIndex === 0 ? 0 : selectedPanelIndex - 1;
+            }
+            return selectedPanelIndex === panelData.length - 1 ? selectedPanelIndex - 1 : selectedPanelIndex + 1;
+        }
         svg
             .attr("cursor","grab")
+            .on("click", (event) => {
+                if (event.defaultPrevented) return; // dragged
+                if(event.target.id && event.target.id.includes("lineClickableRect")){
+                    // do nothing, arrow click
+                } else {
+                    event.preventDefault(); // Add this
+                    event.stopPropagation(); // And this
+                    const newIndex = getClickIndex(event.layerX)
+                    carouselClick(newIndex)
+                }
+
+            })
             .call(
             d3.drag<SVGSVGElement,unknown>()
                 .on("start",dragStart)
@@ -243,29 +239,93 @@ const D3Carousel: FC<D3CarouselProps> = ({
                 .on("end",dragEnd)
         )
 
-        svg.select("#arrowDef")
-            .attr("viewBox", "0 -5 10 10")
-            .attr("orient", "auto")
-            .attr("markerWidth", 10)
-            .attr("markerHeight", 10)
-            .attr("refX", 8 );
+        const countLabelWidth = 40;
+        svg.select(".progressCount")
+            .attr("text-anchor","middle")
+            .attr("font-size",fontSize * 0.8)
+            .attr("font-weight",400)
+            .attr("fill",COLORS.white)
+            .attr("transform",`translate(${panelStart + panelWidthHeight/2},${panelWidthHeight - (fontSize * 0.8)})`)
+            .text(`${selectedPanelIndex + 1}/${panelData.length}`);
 
-        svg.select("#arrowDefPath")
-            .attr("stroke-linecap", "round")
-            .attr("stroke-linejoin", "round")
-            .attr("fill", "transparent")
+        const arrowY = panelWidthHeight - fontSize;
+
+        svg.select("#lineArrowLeft")
+            .attr("stroke-width", 2.5)
+            .attr("stroke-linecap","round")
             .attr("stroke",COLORS.white)
-            .attr("d","M1, -4L9,0L1,4")
+            .attr("marker-end", selectedPanelIndex === 0 ? "" : "url(#arrowDef)")
+            .attr("d",`M${(panelWidthHeight - countLabelWidth)/2},${arrowY} L${countLabelWidth},${arrowY}`)
+            .attr("transform",`translate(${panelStart},0)`)
+
+        svg.select("#lineClickableRectLeft")
+            .attr("pointer-events",selectedPanelIndex === 0 ? "none" :"all")
+            .attr("cursor",selectedPanelIndex === 0 ? "default" :"pointer")
+            .attr("width",(panelWidthHeight - countLabelWidth)/2)
+            .attr("height", 14)
+            .attr("fill","transparent")
+            .attr("transform",`translate(${panelStart +  countLabelWidth/2},${arrowY - 7})`)
+            .on("click", (event) => {
+                if (event.defaultPrevented) return; // dragged
+                if(selectedPanelIndex > 0){
+                    carouselClick(selectedPanelIndex - 1);
+                }
+            });
+
+        svg.select("#lineArrowRight")
+            .attr("cursor",selectedPanelIndex === panelData.length - 1 ? "default" : "pointer")
+            .attr("stroke-width", 2.5)
+            .attr("stroke-linecap","round")
+            .attr("stroke",COLORS.white)
+            .attr("marker-end", selectedPanelIndex === panelData.length - 1 ? "" : "url(#arrowDef)")
+            .attr("d",`M${(panelWidthHeight + countLabelWidth)/2},${arrowY} L${panelWidthHeight - countLabelWidth},${arrowY}`)
+            .attr("transform",`translate(${panelStart},0)`)
+
+        svg.select("#lineClickableRectRight")
+            .attr("pointer-events",selectedPanelIndex === panelData.length - 1 ? "none" : "all")
+            .attr("cursor",selectedPanelIndex === panelData.length - 1 ? "default" : "pointer")
+            .attr("width",(panelWidthHeight - countLabelWidth)/2)
+            .attr("height", 14)
+            .attr("fill","transparent")
+            .attr("transform",`translate(${panelStart +  panelWidthHeight/2},${arrowY - 7})`)
+            .on("click", (event) => {
+                if (event.defaultPrevented) return; // dragged
+                if(selectedPanelIndex < panelData.length - 1){
+                    carouselClick(selectedPanelIndex + 1);
+
+                }
+            });
+
 
     },[panelData,selectedDotId])
 
         return (
             <svg className="carouselContentSvg" ref={ref}>
                 <defs>
-                    <marker id={"arrowDef"}>
-                        <path id={"arrowDefPath"}></path>
+                    <marker
+                        id="arrowDef"
+                        viewBox="0 -5 10 10"
+                        orient="auto"
+                        markerWidth="10"
+                        markerHeight="10"
+                        markerUnits="strokeWidth"
+                        refX="4"
+                        refY="0"
+                    >
+                        <polyline
+                            points="1,-4 5,0 1,4"
+                            fill="none"
+                            stroke="#FFFFFF"
+                            strokeWidth="1"
+                            strokeLinecap="round"
+                        />
                     </marker>
                 </defs>
+                <text className={"progressCount"}/>
+                <rect id={"lineClickableRectLeft"}/>
+                <rect id={"lineClickableRectRight"}/>
+                <path id={"lineArrowLeft"} markerEnd="url(#arrowDef)"/>
+                <path id={"lineArrowRight"} markerEnd="url(#arrowDef)"/>
             </svg>
         )
 

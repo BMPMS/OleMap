@@ -1,16 +1,17 @@
 "use client";
-import React, {useState, useRef, TouchEvent, MouseEvent, useEffect} from "react";
-import InfoPanelChart, { InfoPanelData } from "@/app/components/InfoPanelChart";
+import React, { useState,} from "react";
+import {InfoPanelData} from "@/app/components/D3Carousel";
 import {CATEGORY_COLORS, CATEGORY_NAMES} from "@/app/components/ScrollerMapChart";
 import D3Carousel from "@/app/components/D3Carousel";
-
+import * as d3 from 'd3';
 
 type InfoBoxCarouselProps = {
     expanded: boolean;
-    setExpanded: (newValue: boolean) => void;
+    handleBackToScroll: () => void;
     panelData: InfoPanelData[];
     size: number;
     selectedCategories: Set<number>;
+    setExpanded: (newValue: boolean) => void;
     setSelectedCategories: (newList: Set<number>) => void;
     selectedDot: number;
     setSelectedDotId: (newId: number) => void;
@@ -18,8 +19,9 @@ type InfoBoxCarouselProps = {
 
 export default function InfoBoxCarousel({
     expanded,
-    selectedDot,
+    handleBackToScroll,
     panelData,
+    selectedDot,
     selectedCategories,
     setExpanded,
     setSelectedCategories,
@@ -31,14 +33,17 @@ export default function InfoBoxCarousel({
     const [filterExpanded, setFilterExpanded] = useState(false);
 
     const handleToggle = () => {
-        if(expanded){
-            setSelectedDotId(-1);
+        if(!expanded && selectedDot === -1){
+            setSelectedDotId(panelData[0].id)
         }
         setExpanded(!expanded);
         setFilterExpanded(false);
     }
 
     const handleFilterToggle = () => {
+        if(!filterExpanded && !expanded){
+            setExpanded(true)
+        }
         setFilterExpanded(prev => !prev);
     }
 
@@ -46,7 +51,7 @@ export default function InfoBoxCarousel({
         const {value} = event.target;
         const newSet = new Set(selectedCategories);
 
-        if(newSet.has(+value)){
+        if(newSet.has(+value) && newSet.size > 1){
             newSet.delete(+value)
         } else {
             newSet.add(+value);
@@ -55,8 +60,15 @@ export default function InfoBoxCarousel({
         const filteredPanelData = panelData.filter((f) => newSet.has(f.category));
         setCurrentPanelData(filteredPanelData);
         if(selectedDot !== -1 && !filteredPanelData.find((f) => f.id === selectedDot)){
-            setSelectedDotId(-1);
+            setSelectedDotId(filteredPanelData[0].id);
         }
+
+        d3.selectAll('input.toggleInput[type="checkbox"]').each((d,i,objects) => {
+             const currentInput = objects[i] as HTMLInputElement;
+             d3.select(currentInput)
+                 .property("checked", newSet.has(+currentInput.value))
+        })
+
     }
 
     const allFilterItems = Object.entries(CATEGORY_COLORS).reduce((acc, entry) => {
@@ -68,27 +80,32 @@ export default function InfoBoxCarousel({
         return acc;
     },[] as {key: number, label: string, color: string}[])
 
-    const filterList1 = allFilterItems.filter((f,i) => i < 3);
-    const filterList2 = allFilterItems.filter((f,i) => i >= 3);
+    const filterListOneKeys =   [7, 10,2];
+    const filterListTwoKeys = [5,4,1,3];
+
+    const filterList1 = filterListOneKeys.map((m) => allFilterItems.find((f) => f.key === m))
+        .filter((f) => f !== undefined);
+    const filterList2 = filterListTwoKeys.map((m) => allFilterItems.find((f) => f.key === m))
+        .filter((f) => f !== undefined);
     const FilterList = ( items:  {key: number,label: string, color: string}[] ) => {
         return (
             <div className="flex flex-col">
                 {items.map((item, index) => (
-                    <p key={index} className="flex items-center mb-1.5">
+                    <label key={index} className="cursor-pointer flex items-center mb-1.5">
                         <input
                             type="checkbox"
                             defaultChecked={selectedCategories.has(item.key)}
                             value={item.key}
-                            className="mr-2 w-4 h-4 bg-black checked:bg-black accent-white"
-                            onChange={toggleCategory }
+                            className="toggleInput mr-2 w-4 h-4 rounded appearance-none border border-white bg-black checked:bg-white"
+                            onChange={toggleCategory}
                         />
                         <span
                             className="px-1 py-[1px]"
-                            style={{ backgroundColor: item.color, color: "white", opacity: selectedCategories.has(item.key) ? 1 : 0.4 }}
+                            style={{ fontSize: "20px", backgroundColor: item.color, color: "white", opacity: selectedCategories.has(item.key) ? 1 : 0.4 }}
                         >
             {item.label}
           </span>
-                    </p>
+                    </label>
                 ))}
             </div>
         );
@@ -98,11 +115,17 @@ export default function InfoBoxCarousel({
         setExpanded(false);
     }
 
+    const triggerBackToScroll = () => {
+        setExpanded(false);
+        handleBackToScroll()
+    }
+
+
     return (
         <>
             {/* --- BACKGROUND GRADIENT --- */}
             <div
-                className="noselect infoCarouselBackground transition-transform duration-500 ease-in-out fixed bottom-0 w-full h-[450px] bg-gradient-to-b from-[rgba(0,0,0,0)] to-black  z-800"
+                className="noselect infoBackground bg-gradient-to-b from-black/0 to-black  transition-transform duration-500 ease-in-out fixed bottom-[355px] w-full h-[100px] z-800"
                 onClick={closeInfoBox}
                 style={{
                     opacity: expanded ? 1 : 0,
@@ -111,15 +134,23 @@ export default function InfoBoxCarousel({
             />
             {/* --- Carousel --- */}
             <div
-                className="infoCarousel transition-transform duration-500 ease-in-out fixed inset-x-0 bottom-5 z-[999] flex justify-center  transition-opacity duration-500"
+                className="infoCarousel bg-black bottom-0 h-[355px] fixed inset-x-0  z-[999] flex justify-center "
                  style={{
-                    opacity: expanded ? 1 : 0,
+                    opacity: 0,
                     transform: expanded || filterExpanded ? "translateY(0px)" : "translateY(350px)",
                 }}
             >
-                <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+                <div className="relative flex items-center justify-center" style={{ width: size, height: size * 0.95 }}>
                     {/* --- FLOATING BUTTONS --- */}
                     <div className="noselect absolute -top-14 right-0 flex space-x-3 pointer-events-auto md:right-[-50%] md:translate-x-1/2">
+                        <img
+                            src={`${basePath}/images/backToScroll.svg`}
+                            width={40}
+                            height={40}
+                            className="noselect bg-transparent cursor-pointer transition-transform duration-200 hover:scale-110 hover:brightness-125"
+                            alt="icon"
+                            onClick={triggerBackToScroll}
+                        />
                         <img
                             src={`${basePath}/images/filterBox.svg`}
                             width={40}
@@ -141,17 +172,17 @@ export default function InfoBoxCarousel({
                     {/* --- MAIN CONTENT SWITCH --- */}
                     <div className="w-full h-full flex items-center justify-center">
                         {filterExpanded ? (
-                            <div className="filterMenu w-full h-full flex justify-center overflow-x-visible">
+                            <div className="filterMenu w-full mt-[-80px] h-full flex justify-center overflow-x-visible">
                                 <div
-                                    className="w-[350px] sm:w-[697px] h-full flex-shrink-0 p-4 bg-gradient-to-b from-[rgba(0,0,0,0)] to-black"
+                                    className="w-[350px] sm:w-[697px] h-full flex-shrink-0 p-4 bg-gradient-to-b from-black/0 to-black"
                                 >
                                     {/* Header with icon and text on same line */}
-                                    <p className="flex items-center font-bold text-[24px] leading-[26px] mb-2">
+                                    <p className="flex items-center font-bold text-[24px] leading-[26px] m-0">
                                         <img
                                             src={`${basePath}/images/filterBoxMenu.svg`}
                                             width={40}
                                             height={40}
-                                            className="noselect mr-2"
+                                            className="noselect ml-[-10px] mr-2"
                                             alt="icon"
                                         />
                                         Filteroptionen

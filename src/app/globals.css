@@ -24,6 +24,7 @@
   }
 }
 
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -38,6 +39,7 @@ svg {
   font-family: var(--font-bebas), sans-serif;
   position: relative;
   padding: 0rem;
+  margin: 0;
 }
 
 
@@ -45,11 +47,10 @@ article {
   position: relative;
   pointer-events: none;
   padding: 0px;
-  padding-top: 90vh;
-  max-width: calc(max(40rem, 80vw));
+  padding-top: 100vh;
   margin: 0 auto;
   z-index: 500;
-  gap: 4rem;  /* <--- guaranteed spacing between steps */
+  width: 100%;
 }
 
 figure {
@@ -65,36 +66,8 @@ figure {
 }
 
 
-.step {
-  margin: 0 auto 2rem auto;
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #D1C0AF; /* thickness, style, and color */
-  border-radius: 0.4rem;    /* controls how rounded the corners are */
-  padding: 15px;     /* optional: adds spacing inside the div */
-  height: auto;
-  font-size: 20px;
-  line-height: 26px;
-  text-align: center;
-}
-
-.step img {
-  padding-top: 0.5rem;
-  display: inline-block;
-  padding-bottom: 0.5rem;
-}
-.step:last-child {
-  margin-bottom: 0;
-}
-
-.step.is-active p{
-  opacity: 1;
-}
-
-.step p {
-  text-align: center;
-  padding: 0.75rem;
-  font-size: 1rem;
+.stepContentGroup{
+  width: 100%;
 }
 
 @keyframes pulse {
@@ -107,4 +80,105 @@ figure {
   animation: pulse 1s ease-in-out infinite;
   transform-origin: center;
 }
+
+.step {
+  margin: 0 auto 0 auto;
+  background-color: #000000;
+  color: #ffffff;
+  border: 2px solid #D1C0AF; /* thickness, style, and color */
+  padding: 15px;     /* optional: adds spacing inside the div */
+  height: auto;
+  font-size: 20px;
+  text-align: left;
+}
+
+
+
+.step img {
+  display: block;     /* Makes image a block element */
+  margin: 0 auto;
+  width: 350px;
+  margin-top: 25px;
+}
+
+.step {
+  width: calc(100vw - 160px);
+  max-width: 736px;
+  margin-bottom: 300px;
+}
+
+.step p {
+  text-align: left;
+}
+
+.step.categories span {
+  text-align: center;
+  display: block ;
+  padding: 0 15%;
+}
+.step.categories p {
+  text-align: left; /* Override the left alignment for this specific case */
+}
+.d3ChartContainer {
+  width: min(
+          calc(100vw - 160px),
+          1200px,
+          calc(70vh / 0.525)   /* height constraint converted to width */
+  );
+  height: auto;
+  aspect-ratio: 1 / 0.525;
+}
+
+.d3ChartContainer.scrollFinished {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  aspect-ratio: auto;
+  height: 100vh;
+}
+
+@media (max-width: 1024px) {
+  .step {
+    width: calc(100vw - 120px); /* Add this */
+    margin-bottom: 250px;
+  }
+
+  .d3ChartContainer {
+    width: calc(100vw - 120px); /* Add this */
+  }
+
+  .d3ChartContainer.scrollFinished {
+    width: 100vw;
+  }
+}
+
+@media (max-width: 768px) {
+  .step {
+    width: calc(100% - 30px);
+  }
+
+  .d3ChartContainer {
+    width: calc(100% - 30px);
+  }
+
+  .d3ChartContainer.scrollFinished {
+    width: 100vw;
+  }
+}
+
+input[type="checkbox"]:checked::before {
+  content: "\f00c"; /* Font Awesome check icon */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  color: black;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 
